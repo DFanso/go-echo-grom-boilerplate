@@ -1,11 +1,12 @@
 # Go Echo Boilerplate
 
-A production-ready boilerplate for building RESTful APIs using Go Echo framework with MongoDB.
+A production-ready boilerplate for building RESTful APIs using Go Echo framework with PostgreSQL and GORM.
 
 ## Features
 
 - **Echo Framework**: High performance, minimalist Go web framework
-- **MongoDB Integration**: Using qmgo as ORM
+- **PostgreSQL & GORM**: Using GORM as ORM with PostgreSQL
+- **UUID Support**: UUID primary keys for better data distribution
 - **Clean Architecture**: Follows clean architecture principles with proper separation of concerns
 - **Environment Management**: Multiple environment support with proper configuration management
 - **Structured Logging**: Custom logging middleware with colored output
@@ -27,7 +28,6 @@ A production-ready boilerplate for building RESTful APIs using Go Echo framework
 │   ├── models/                # Data models
 │   ├── repositories/          # Data access layer
 │   ├── routes/                # Route definitions
-│   │   └── v1/               # API version 1 routes
 │   └── services/             # Business logic
 ├── pkg/
 │   ├── database/             # Database connections
@@ -43,7 +43,7 @@ A production-ready boilerplate for building RESTful APIs using Go Echo framework
 ## Prerequisites
 
 - Go 1.21 or higher
-- MongoDB 4.4 or higher
+- PostgreSQL 12 or higher
 - Air (for hot reload)
 
 ## Getting Started
@@ -87,24 +87,23 @@ A production-ready boilerplate for building RESTful APIs using Go Echo framework
 ```env
 # Server Configuration
 SERVER_PORT=8080
-APP_ENV=development
-APP_NAME=go-echo-api
-LOG_LEVEL=debug
 
-# MongoDB Configuration
-MONGODB_URI=mongodb://localhost:27017
-MONGODB_DATABASE=go_echo_db
-MONGODB_TIMEOUT_SECONDS=30
+# PostgreSQL Configuration
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=myapp
 ```
 
 ## API Endpoints
 
 ### User Routes
-- `GET /api/v1/users` - Get all users
-- `GET /api/v1/users/:id` - Get user by ID
-- `POST /api/v1/users` - Create new user
-- `PUT /api/v1/users/:id` - Update user
-- `DELETE /api/v1/users/:id` - Delete user
+- `GET /api/users` - Get all users
+- `GET /api/users/:id` - Get user by ID
+- `POST /api/users` - Create new user
+- `PUT /api/users/:id` - Update user
+- `DELETE /api/users/:id` - Delete user
 
 ### Health Check
 - `GET /health` - Service health check
@@ -114,21 +113,26 @@ MONGODB_TIMEOUT_SECONDS=30
 ### Create User
 ```bash
 # Request
-curl -X POST http://localhost:8080/api/v1/users \
+curl -X POST http://localhost:8080/api/users \
   -H "Content-Type: application/json" \
   -d '{
     "name": "John Doe",
-    "email": "john@example.com"
+    "email": "john@example.com",
+    "password": "securepass123",
+    "role": "user",
+    "status": "active"
   }'
 
 # Response
 {
-  "status": "success",
+  "success": true,
   "message": "User created successfully",
   "data": {
-    "id": "60d5ecb8e3c8768b3c4b4b1e",
+    "id": "123e4567-e89b-12d3-a456-426614174000",
     "name": "John Doe",
     "email": "john@example.com",
+    "role": "user",
+    "status": "active",
     "created_at": "2025-01-04T10:30:00Z",
     "updated_at": "2025-01-04T10:30:00Z"
   }
@@ -141,41 +145,27 @@ curl -X POST http://localhost:8080/api/v1/users \
 
 1. Create a new controller in `internal/controllers/`
 2. Add corresponding service and repository if needed
-3. Register routes in `internal/routes/v1/`
+3. Register routes in `internal/routes/`
 
 Example:
 ```go
-// internal/routes/v1/new_route.go
-package v1
-
-func RegisterNewRoutes(v1 *echo.Group, controller *controllers.NewController) {
-    group := v1.Group("/resource")
-    group.GET("", controller.GetAll)
-    group.POST("", controller.Create)
+// internal/routes/routes.go
+func RegisterRoutes(e *echo.Echo, controller *controllers.UserController) {
+    api := e.Group("/api")
+    api.GET("/users", controller.GetAll)
+    api.POST("/users", controller.Create)
 }
 ```
 
 ### Error Handling
 
-The boilerplate includes a centralized error handling system. Use the utility functions in `pkg/utils/response.go`:
+The boilerplate includes a centralized error handling system:
 
 ```go
 if err != nil {
     return utils.ErrorResponse(ctx, http.StatusBadRequest, "Error message", err)
 }
 return utils.SuccessResponse(ctx, http.StatusOK, "Success message", data)
-```
-
-## Testing - not implemented yet
-
-Run tests:
-```bash
-go test ./...
-```
-
-With coverage:
-```bash
-go test ./... -cover
 ```
 
 ## Production Deployment
@@ -194,7 +184,6 @@ go test ./... -cover
    ```bash
    ./app
    ```
-
 
 ## License
 
