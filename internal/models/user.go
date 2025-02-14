@@ -4,103 +4,61 @@ import (
 	"time"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/go-ozzo/ozzo-validation/v4/is"
+	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
-const (
-	UserStatusActive   = "active"
-	UserStatusInactive = "inactive"
-	UserStatusBanned   = "banned"
+type Role string
+type Status string
 
+const (
+	// Roles
+	RoleAdmin Role = "admin"
+	RoleUser  Role = "user"
+
+	// Statuses
+	StatusActive   Status = "active"
+	StatusInactive Status = "inactive"
+	StatusBanned   Status = "banned"
+
+	// Password constraints
 	MinPasswordLength = 8
 	MaxPasswordLength = 72
 )
 
-type Role string
-
-const (
-	RoleAdmin Role = "admin"
-	RoleUser  Role = "user"
-)
-
 type User struct {
 	ID        uuid.UUID      `json:"id" gorm:"type:uuid;primary_key;default:uuid_generate_v4()"`
-	Name      string         `json:"name" gorm:"not null"`
-	Email     string         `json:"email" gorm:"uniqueIndex;not null"`
-	Password  string         `json:"password,omitempty" gorm:"not null"`
-	Role      Role           `json:"role" gorm:"type:varchar(20);not null;default:'user'"`
-	Status    string         `json:"status" gorm:"type:varchar(20);not null"`
+	Name      string         `json:"name" validate:"required,min=2,max=50" gorm:"not null"`
+	Email     string         `json:"email" validate:"required,email" gorm:"uniqueIndex;not null"`
+	Password  string         `json:"password,omitempty" validate:"required,min=8,max=72" gorm:"not null"`
+	Role      Role           `json:"role" validate:"required,oneof=admin user" gorm:"type:varchar(20);not null;default:'user'"`
+	Status    Status         `json:"status" validate:"required,oneof=active inactive banned" gorm:"type:varchar(20);not null;default:'active'"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"`
 }
 
-func (u User) Validate() error {
-	return validation.ValidateStruct(&u,
-		// Name validation
-		validation.Field(&u.Name,
-			validation.Required.Error("name is required"),
-			validation.Length(2, 50).Error("name must be between 2 and 50 characters"),
-		),
+// Create a singleton validator instance
+var validate *validator.Validate
 
-		// Email validation
-		validation.Field(&u.Email,
-			validation.Required.Error("email is required"),
-			is.Email.Error("invalid email format"),
-		),
+func init() {
+	validate = validator.New()
+}
 
-		// Password validation
-		validation.Field(&u.Password,
-			validation.Required.Error("password is required"),
-			validation.Length(MinPasswordLength, MaxPasswordLength).
-				Error("password must be between 8 and 72 characters"),
-		),
-
-		// Role validation
-		validation.Field(&u.Role,
-			validation.Required.Error("role is required"),
-			validation.In(RoleAdmin, RoleUser).Error("invalid role"),
-		),
-
-		// Status validation
-		validation.Field(&u.Status,
-			validation.Required.Error("status is required"),
-			validation.In(UserStatusActive, UserStatusInactive, UserStatusBanned).
-				Error("invalid status"),
-		),
-	)
+func (u *User) Validate() error {
+	return validate.Struct(u)
 }
 
 func (u *User) ValidateUpdate() error {
-	return validation.ValidateStruct(&u,
-		validation.Field(&u.Name,
-			validation.Required.Error("name is required"),
-			validation.Length(2, 50).Error("name must be between 2 and 50 characters"),
-		),
-		validation.Field(&u.Email,
-			validation.Required.Error("email is required"),
-			is.Email.Error("invalid email format"),
-		),
-		// Password is optional during update
-		validation.Field(&u.Password,
-			validation.When(len(u.Password) > 0, validation.Length(MinPasswordLength, MaxPasswordLength).
-				Error("password must be between 8 and 72 characters")),
-		),
-		validation.Field(&u.Role,
-			validation.Required.Error("role is required"),
-			validation.In(RoleAdmin, RoleUser).Error("invalid role"),
-		),
-		validation.Field(&u.Status,
-			validation.Required.Error("status is required"),
-			validation.In(UserStatusActive, UserStatusInactive, UserStatusBanned).
-				Error("invalid status"),
-		),
-	)
+	if u.Password != "" {
+		return validate.StructPartial(u, "Name", "Email", "Password", "Role", "Status")
+	}
+	return validate.StructPartial(u, "Name", "Email", "Role", "Status")
 }
 
+// Password handling methods
 func (u *User) HashPassword() error {
 	if len(u.Password) == 0 {
 		return validation.NewError("validation_error", "password cannot be empty")
@@ -119,7 +77,8 @@ func (u *User) ComparePassword(password string) error {
 	return bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password))
 }
 
-func (u *User) beforeCreate(tx *gorm.DB) error {
+// GORM Hooks
+func (u *User) BeforeCreate(tx *gorm.DB) error {
 	// Set timestamps
 	now := time.Now()
 	u.CreatedAt = now
@@ -130,13 +89,13 @@ func (u *User) beforeCreate(tx *gorm.DB) error {
 		u.Role = RoleUser
 	}
 	if u.Status == "" {
-		u.Status = UserStatusActive
+		u.Status = StatusActive
 	}
 
 	return nil
 }
 
-func (u *User) beforeUpdate(tx *gorm.DB) error {
+func (u *User) BeforeUpdate(tx *gorm.DB) error {
 	u.UpdatedAt = time.Now()
 	return nil
 }
