@@ -5,6 +5,7 @@ import (
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -26,11 +27,11 @@ const (
 )
 
 type User struct {
-	ID        uint           `json:"id" gorm:"primaryKey"`
+	ID        uuid.UUID      `json:"id" gorm:"type:uuid;primary_key;default:uuid_generate_v4()"`
 	Name      string         `json:"name" gorm:"not null"`
 	Email     string         `json:"email" gorm:"uniqueIndex;not null"`
 	Password  string         `json:"password,omitempty" gorm:"not null"`
-	Role      Role           `json:"role" gorm:"type:varchar(20);not null"`
+	Role      Role           `json:"role" gorm:"type:varchar(20);not null;default:'user'"`
 	Status    string         `json:"status" gorm:"type:varchar(20);not null"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`

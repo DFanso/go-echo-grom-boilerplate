@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/dfanso/go-echo-boilerplate/internal/models"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -36,9 +37,9 @@ func (r *UserRepository) FindAll(ctx context.Context) ([]models.User, error) {
 	return users, result.Error
 }
 
-func (r *UserRepository) FindByID(ctx context.Context, id uint) (*models.User, error) {
+func (r *UserRepository) FindByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
 	var user models.User
-	result := r.db.WithContext(ctx).First(&user, id)
+	result := r.db.WithContext(ctx).First(&user, "id = ?", id)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -53,6 +54,6 @@ func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
 	return r.db.WithContext(ctx).Save(user).Error
 }
 
-func (r *UserRepository) Delete(ctx context.Context, id uint) error {
-	return r.db.WithContext(ctx).Delete(&models.User{}, id).Error
+func (r *UserRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Delete(&models.User{}, "id = ?", id).Error
 }

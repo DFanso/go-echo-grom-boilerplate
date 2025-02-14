@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/dfanso/go-echo-boilerplate/internal/models"
 	"github.com/dfanso/go-echo-boilerplate/internal/services"
 	"github.com/dfanso/go-echo-boilerplate/pkg/utils"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
@@ -34,12 +34,17 @@ func (c *UserController) GetAll(ctx echo.Context) error {
 }
 
 func (c *UserController) GetByID(ctx echo.Context) error {
-	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
+	id := ctx.Param("id")
+	if id == "" {
+		return utils.ErrorResponse(ctx, http.StatusBadRequest, "User ID is required", nil)
+	}
+
+	parsedID, err := uuid.Parse(id)
 	if err != nil {
 		return utils.ErrorResponse(ctx, http.StatusBadRequest, "Invalid ID format", err)
 	}
 
-	user, err := c.service.GetByID(ctx.Request().Context(), uint(id))
+	user, err := c.service.GetByID(ctx.Request().Context(), parsedID)
 	if err != nil {
 		return utils.ErrorResponse(ctx, http.StatusNotFound, "User not found", err)
 	}
@@ -99,9 +104,9 @@ func (c *UserController) Create(ctx echo.Context) error {
 }
 
 func (c *UserController) Update(ctx echo.Context) error {
-	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
-	if err != nil {
-		return utils.ErrorResponse(ctx, http.StatusBadRequest, "Invalid ID format", err)
+	id := ctx.Param("id")
+	if id == "" {
+		return utils.ErrorResponse(ctx, http.StatusBadRequest, "User ID is required", nil)
 	}
 
 	var user models.User
@@ -109,7 +114,7 @@ func (c *UserController) Update(ctx echo.Context) error {
 		return utils.ErrorResponse(ctx, http.StatusBadRequest, "Invalid request body", err)
 	}
 
-	user.ID = uint(id)
+	user.ID = uuid.MustParse(id)
 	user.UpdatedAt = time.Now()
 
 	// Validate fields
@@ -135,12 +140,17 @@ func (c *UserController) Update(ctx echo.Context) error {
 }
 
 func (c *UserController) Delete(ctx echo.Context) error {
-	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
+	id := ctx.Param("id")
+	if id == "" {
+		return utils.ErrorResponse(ctx, http.StatusBadRequest, "User ID is required", nil)
+	}
+
+	parsedID, err := uuid.Parse(id)
 	if err != nil {
 		return utils.ErrorResponse(ctx, http.StatusBadRequest, "Invalid ID format", err)
 	}
 
-	if err := c.service.Delete(ctx.Request().Context(), uint(id)); err != nil {
+	if err := c.service.Delete(ctx.Request().Context(), parsedID); err != nil {
 		return utils.ErrorResponse(ctx, http.StatusInternalServerError, "Failed to delete user", err)
 	}
 

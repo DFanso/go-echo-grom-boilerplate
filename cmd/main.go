@@ -32,8 +32,13 @@ func main() {
 		log.Fatalf("Failed to connect to PostgreSQL: %v", err)
 	}
 
-	// Auto Migrate the schema
-	err = db.AutoMigrate(&models.User{})
+	// Enable UUID extension if it doesn't exist
+	db.Exec("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"")
+
+	// Auto Migrate the schema with GORM
+	err = db.AutoMigrate(
+		&models.User{}, // Add other models here as needed
+	)
 	if err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}

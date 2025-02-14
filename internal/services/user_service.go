@@ -3,6 +3,8 @@ package services
 import (
 	"context"
 
+	"github.com/google/uuid"
+
 	"github.com/dfanso/go-echo-boilerplate/internal/models"
 	"github.com/dfanso/go-echo-boilerplate/internal/repositories"
 )
@@ -25,7 +27,7 @@ func (s *UserService) GetAll(ctx context.Context) ([]models.User, error) {
 	return s.repo.FindAll(ctx)
 }
 
-func (s *UserService) GetByID(ctx context.Context, id uint) (*models.User, error) {
+func (s *UserService) GetByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
 	return s.repo.FindByID(ctx, id)
 }
 
@@ -37,6 +39,6 @@ func (s *UserService) Update(ctx context.Context, user *models.User) error {
 	return s.repo.Update(ctx, user)
 }
 
-func (s *UserService) Delete(ctx context.Context, id uint) error {
+func (s *UserService) Delete(ctx context.Context, id uuid.UUID) error {
 	return s.repo.Delete(ctx, id)
 }
