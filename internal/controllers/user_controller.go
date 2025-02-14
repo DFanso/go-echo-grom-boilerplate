@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/dfanso/go-echo-boilerplate/internal/models"
 	"github.com/dfanso/go-echo-boilerplate/internal/services"
 	"github.com/dfanso/go-echo-boilerplate/pkg/utils"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/labstack/echo/v4"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type UserController struct {
@@ -34,12 +34,12 @@ func (c *UserController) GetAll(ctx echo.Context) error {
 }
 
 func (c *UserController) GetByID(ctx echo.Context) error {
-	id, err := primitive.ObjectIDFromHex(ctx.Param("id"))
+	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
 	if err != nil {
 		return utils.ErrorResponse(ctx, http.StatusBadRequest, "Invalid ID format", err)
 	}
 
-	user, err := c.service.GetByID(ctx.Request().Context(), id)
+	user, err := c.service.GetByID(ctx.Request().Context(), uint(id))
 	if err != nil {
 		return utils.ErrorResponse(ctx, http.StatusNotFound, "User not found", err)
 	}
@@ -57,16 +57,32 @@ func (c *UserController) Create(ctx echo.Context) error {
 		return utils.ErrorResponse(ctx, http.StatusBadRequest, "Invalid request body", err)
 	}
 
-	// Call BeforeCreate which includes validation
-	if err := user.BeforeCreate(); err != nil {
-		// Handle validation errors specifically
+	// Set defaults and validate
+	now := time.Now()
+	user.CreatedAt = now
+	user.UpdatedAt = now
+
+	if user.Role == "" {
+		user.Role = models.RoleUser
+	}
+	if user.Status == "" {
+		user.Status = models.UserStatusActive
+	}
+
+	// Validate all fields
+	if err := user.Validate(); err != nil {
 		if e, ok := err.(validation.Errors); ok {
 			return utils.ErrorResponse(ctx, http.StatusBadRequest, "Validation failed", e)
 		}
 		return utils.ErrorResponse(ctx, http.StatusBadRequest, "Invalid user data", err)
 	}
 
-	filter := bson.M{"email": user.Email}
+	// Hash password
+	if err := user.HashPassword(); err != nil {
+		return utils.ErrorResponse(ctx, http.StatusInternalServerError, "Failed to process password", err)
+	}
+
+	filter := map[string]interface{}{"email": user.Email}
 	existingUser, err := c.service.FindOne(ctx.Request().Context(), filter)
 	if err != nil {
 		return utils.ErrorResponse(ctx, http.StatusInternalServerError, "Error checking for existing user", err)
@@ -83,7 +99,7 @@ func (c *UserController) Create(ctx echo.Context) error {
 }
 
 func (c *UserController) Update(ctx echo.Context) error {
-	id, err := primitive.ObjectIDFromHex(ctx.Param("id"))
+	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
 	if err != nil {
 		return utils.ErrorResponse(ctx, http.StatusBadRequest, "Invalid ID format", err)
 	}
@@ -93,15 +109,22 @@ func (c *UserController) Update(ctx echo.Context) error {
 		return utils.ErrorResponse(ctx, http.StatusBadRequest, "Invalid request body", err)
 	}
 
-	user.ID = id
+	user.ID = uint(id)
+	user.UpdatedAt = time.Now()
 
-	// Call BeforeUpdate which includes validation
-	if err := user.BeforeUpdate(); err != nil {
-		// Handle validation errors specifically
+	// Validate fields
+	if err := user.ValidateUpdate(); err != nil {
 		if e, ok := err.(validation.Errors); ok {
 			return utils.ErrorResponse(ctx, http.StatusBadRequest, "Validation failed", e)
 		}
 		return utils.ErrorResponse(ctx, http.StatusBadRequest, "Invalid user data", err)
+	}
+
+	// Hash password if provided
+	if user.Password != "" {
+		if err := user.HashPassword(); err != nil {
+			return utils.ErrorResponse(ctx, http.StatusInternalServerError, "Failed to process password", err)
+		}
 	}
 
 	if err := c.service.Update(ctx.Request().Context(), &user); err != nil {
@@ -112,12 +135,12 @@ func (c *UserController) Update(ctx echo.Context) error {
 }
 
 func (c *UserController) Delete(ctx echo.Context) error {
-	id, err := primitive.ObjectIDFromHex(ctx.Param("id"))
+	id, err := strconv.ParseUint(ctx.Param("id"), 10, 32)
 	if err != nil {
 		return utils.ErrorResponse(ctx, http.StatusBadRequest, "Invalid ID format", err)
 	}
 
-	if err := c.service.Delete(ctx.Request().Context(), id); err != nil {
+	if err := c.service.Delete(ctx.Request().Context(), uint(id)); err != nil {
 		return utils.ErrorResponse(ctx, http.StatusInternalServerError, "Failed to delete user", err)
 	}
 

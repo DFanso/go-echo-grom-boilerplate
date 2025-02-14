@@ -2,72 +2,57 @@ package repositories
 
 import (
 	"context"
-	"time"
+	"errors"
 
 	"github.com/dfanso/go-echo-boilerplate/internal/models"
-
-	"github.com/qiniu/qmgo"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"gorm.io/gorm"
 )
 
 type UserRepository struct {
-	collection *qmgo.Collection
+	db *gorm.DB
 }
 
-func NewUserRepository(db *qmgo.Database) *UserRepository {
+func NewUserRepository(db *gorm.DB) *UserRepository {
 	return &UserRepository{
-		collection: db.Collection("users"),
+		db: db,
 	}
 }
 
-func (r *UserRepository) FindOne(ctx context.Context, filter interface{}) (*models.User, error) {
+func (r *UserRepository) FindOne(ctx context.Context, query interface{}) (*models.User, error) {
 	var user models.User
-
-	err := r.collection.Find(ctx, filter).One(&user)
-	if err != nil {
-		if err == qmgo.ErrNoSuchDocuments {
+	result := r.db.WithContext(ctx).Where(query).First(&user)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, result.Error
 	}
-
 	return &user, nil
 }
 
 func (r *UserRepository) FindAll(ctx context.Context) ([]models.User, error) {
 	var users []models.User
-	err := r.collection.Find(ctx, bson.M{}).All(&users)
-	return users, err
+	result := r.db.WithContext(ctx).Find(&users)
+	return users, result.Error
 }
 
-func (r *UserRepository) FindByID(ctx context.Context, id primitive.ObjectID) (*models.User, error) {
+func (r *UserRepository) FindByID(ctx context.Context, id uint) (*models.User, error) {
 	var user models.User
-	err := r.collection.Find(ctx, bson.M{"_id": id}).One(&user)
-	if err != nil {
-		return nil, err
+	result := r.db.WithContext(ctx).First(&user, id)
+	if result.Error != nil {
+		return nil, result.Error
 	}
 	return &user, nil
 }
 
 func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
-	user.CreatedAt = time.Now()
-	user.UpdatedAt = time.Now()
-
-	_, err := r.collection.InsertOne(ctx, user)
-	return err
+	return r.db.WithContext(ctx).Create(user).Error
 }
 
 func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
-	user.UpdatedAt = time.Now()
-
-	return r.collection.UpdateOne(
-		ctx,
-		bson.M{"_id": user.ID},
-		bson.M{"$set": user},
-	)
+	return r.db.WithContext(ctx).Save(user).Error
 }
 
-func (r *UserRepository) Delete(ctx context.Context, id primitive.ObjectID) error {
-	return r.collection.RemoveId(ctx, id)
+func (r *UserRepository) Delete(ctx context.Context, id uint) error {
+	return r.db.WithContext(ctx).Delete(&models.User{}, id).Error
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/dfanso/go-echo-boilerplate/config"
 	"github.com/dfanso/go-echo-boilerplate/internal/controllers"
+	"github.com/dfanso/go-echo-boilerplate/internal/models"
 	"github.com/dfanso/go-echo-boilerplate/internal/repositories"
 	"github.com/dfanso/go-echo-boilerplate/internal/routes"
 	"github.com/dfanso/go-echo-boilerplate/internal/services"
@@ -19,10 +20,22 @@ func main() {
 	// Load configuration
 	cfg := config.Load()
 
-	// Initialize MongoDB
-	db, err := database.NewMongoClient(cfg.MongoDB.URI, cfg.MongoDB.NAME)
+	// Initialize PostgreSQL
+	db, err := database.NewPostgresClient(
+		cfg.Postgres.Host,
+		cfg.Postgres.User,
+		cfg.Postgres.Password,
+		cfg.Postgres.DBName,
+		cfg.Postgres.Port,
+	)
 	if err != nil {
-		log.Fatalf("Failed to connect to MongoDB: %v", err)
+		log.Fatalf("Failed to connect to PostgreSQL: %v", err)
+	}
+
+	// Auto Migrate the schema
+	err = db.AutoMigrate(&models.User{})
+	if err != nil {
+		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
 	// Initialize Echo

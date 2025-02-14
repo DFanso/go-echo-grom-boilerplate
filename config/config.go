@@ -10,9 +10,12 @@ type Config struct {
 	Server struct {
 		Port string
 	}
-	MongoDB struct {
-		URI  string
-		NAME string
+	Postgres struct {
+		Host     string
+		Port     string
+		User     string
+		Password string
+		DBName   string
 	}
 }
 
@@ -25,9 +28,12 @@ func Load() *Config {
 	// Server configuration
 	cfg.Server.Port = getEnv("SERVER_PORT", "8080")
 
-	// MongoDB configuration
-	cfg.MongoDB.URI = getEnv("MONGODB_URI", "mongodb://localhost:27017")
-	cfg.MongoDB.NAME = getEnv("MONGODB_NAME", "Test")
+	// PostgreSQL configuration
+	cfg.Postgres.Host = getEnv("POSTGRES_HOST", "localhost")
+	cfg.Postgres.Port = getEnv("POSTGRES_PORT", "5432")
+	cfg.Postgres.User = getEnv("POSTGRES_USER", "postgres")
+	cfg.Postgres.Password = getEnv("POSTGRES_PASSWORD", "postgres")
+	cfg.Postgres.DBName = getEnv("POSTGRES_DB", "myapp")
 
 	return cfg
 }

@@ -5,8 +5,8 @@ import (
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 const (
@@ -26,14 +26,15 @@ const (
 )
 
 type User struct {
-	ID        primitive.ObjectID `json:"id" bson:"_id,omitempty"`
-	Name      string             `json:"name" bson:"name"`
-	Email     string             `json:"email" bson:"email"`
-	Password  string             `json:"password,omitempty" bson:"password"`
-	Role      Role               `json:"role" bson:"role"`
-	Status    string             `json:"status" bson:"status"`
-	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
-	UpdatedAt time.Time          `json:"updated_at" bson:"updated_at"`
+	ID        uint           `json:"id" gorm:"primaryKey"`
+	Name      string         `json:"name" gorm:"not null"`
+	Email     string         `json:"email" gorm:"uniqueIndex;not null"`
+	Password  string         `json:"password,omitempty" gorm:"not null"`
+	Role      Role           `json:"role" gorm:"type:varchar(20);not null"`
+	Status    string         `json:"status" gorm:"type:varchar(20);not null"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"`
 }
 
 func (u User) Validate() error {
@@ -117,7 +118,7 @@ func (u *User) ComparePassword(password string) error {
 	return bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password))
 }
 
-func (u *User) BeforeCreate() error {
+func (u *User) beforeCreate(tx *gorm.DB) error {
 	// Set timestamps
 	now := time.Now()
 	u.CreatedAt = now
@@ -131,27 +132,10 @@ func (u *User) BeforeCreate() error {
 		u.Status = UserStatusActive
 	}
 
-	// Validate all fields
-	if err := u.Validate(); err != nil {
-		return err
-	}
-
-	// Hash password
-	return u.HashPassword()
+	return nil
 }
 
-func (u *User) BeforeUpdate() error {
+func (u *User) beforeUpdate(tx *gorm.DB) error {
 	u.UpdatedAt = time.Now()
-
-	// Validate fields
-	if err := u.ValidateUpdate(); err != nil {
-		return err
-	}
-
-	// Hash password if provided
-	if u.Password != "" {
-		return u.HashPassword()
-	}
-
 	return nil
 }
